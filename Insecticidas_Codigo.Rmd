@@ -41,8 +41,7 @@ Se analizó la efectividad de los insecticidas $A$, $B$ y $C$, probando seis dif
 
 ```{r importar_desagrupar}
 # Importamos los datos.
-setwd("C:\\Users\\EQUIPO\\documentos_fer\\Escuela\\SeminarioEstadistica2\\Tareas\\Tarea 1")
-df_agrupado <- read.csv("Preg3vB.csv")
+df_agrupado <- read.csv("Datos_Insecticidas.csv")
 
 # Desagrupamos los datos.
 df <- df_agrupado %>%
@@ -437,4 +436,5 @@ summary(glht(fitlogit2, linfct=K, rhs=m), test = Ftest())
   # No hay evidencia suficiente para concluir que A y B se comportan diferente.
   # Concluimos que se comportan de manera similar.
 ```
+
 El resultado de la prueba fue un p-value = 0.462, por tanto, no podemos rechazar $H_0$ y no hay evidencia para garantizar que los insecticidas $A$ y $B$ se comportan diferente. Por falta de evidencia, podemos asumir que tienen un rendimiento similar.
