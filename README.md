@@ -12,11 +12,11 @@ El objetivo del análisis es:
 
 ---
 
-## Descripción de los datos
+## Descripción de los datos.
 - Datos experimentales con respuestas binarias agrupadas.
 - Tres insecticidas evaluados a distintos niveles de dosis.
 - Los datos se encontraban originalmente agrupados y posteriormente se desagruparon para el ajuste de modelos.
-
+Los datos pueden consultarse en el archivo _Datos_Insecticidas.csv_ del mismo repositorio.
 ---
 
 ## Metodología
@@ -55,6 +55,7 @@ Se ajustaron distintos modelos lineales generalizados:
 - Los insecticidas restantes mostraron un rendimiento **similar entre sí e inferior** al tratamiento más efectivo.
 - La relación dosis–respuesta varía entre insecticidas, evidenciando efectos de interacción.
 
+El reporte puede consultarse en el archivo _Reporte_Insecticidas.pdf_ del mismo repositorio.
 ---
 
 ## Herramientas y tecnologías
