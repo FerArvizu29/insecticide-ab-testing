@@ -55,9 +55,8 @@ Se ajustaron distintos modelos lineales generalizados:
 - Se identificó un insecticida con **efectividad significativamente mayor**.
 - Los insecticidas restantes mostraron un rendimiento **similar entre sí e inferior** al tratamiento más efectivo.
 - La relación dosis–respuesta varía entre insecticidas, evidenciando efectos de interacción.
-
-
 El reporte puede consultarse en el archivo _Reporte_Insecticidas.pdf_ del mismo repositorio.
+
 ---
 
 ## Herramientas y tecnologías
