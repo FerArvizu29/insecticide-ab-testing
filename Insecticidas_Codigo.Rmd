@@ -1,0 +1,440 @@
+---
+title: "**Análisis comparativo de dosis de insecticidas y su impacto en la efectividad**" 
+output: pdf_document
+geometry: margin=1.5cm
+lang: es
+header-includes:
+   - \usepackage{graphicx}
+   - \usepackage{float}
+   - \usepackage{wrapfig}
+   - \usepackage[utf8]{inputenc}
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+#Limpiamos entorno
+rm(list = ls(all.names = TRUE))
+gc() #Liberamos memoria
+
+# Carpeta de trabajo.
+# setwd()
+
+#Opciones por defecto para los chunks.
+knitr::opts_chunk$set(
+	error = FALSE,            #Para que no se muestren los errores
+	fig.align = "center",     #Alineamiento de las figuras
+	fig.dim = c(7, 7),        #Tamaño horizontal y vertical de las figuras
+	message = FALSE,          #Para que no surjan mensajes
+	warning = FALSE,          #Tampoco salen advertencias
+	include = FALSE           #Este indica que no se muestre salida ni código 
+)
+# cargamos librerías:
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(tibble)
+library(DHARMa)
+library(multcomp)
+```
+
+Se analizó la efectividad de los insecticidas $A$, $B$ y $C$, probando seis diferentes dosis en diferentes grupos homogeneos de insectos.
+
+```{r importar_desagrupar}
+# Importamos los datos.
+setwd("C:\\Users\\EQUIPO\\documentos_fer\\Escuela\\SeminarioEstadistica2\\Tareas\\Tarea 1")
+df_agrupado <- read.csv("Preg3vB.csv")
+
+# Desagrupamos los datos.
+df <- df_agrupado %>%
+  rowwise() %>%
+  do({
+    total <- .$Number
+    killed <- .$Killed
+    insecticide <- .$Insecticide
+    deposit <- .$Deposit
+    
+    # Crear un vector de 0 y 1
+    Killed_vec <- c(rep(1, killed), rep(0, total - killed))
+    
+    data.frame(Dead = Killed_vec,
+               Insecticide = insecticide,
+               Deposit = deposit)
+  }) %>%
+  ungroup()
+
+df$Dead <- factor(df$Dead, labels = c("Alive", "Dead"))
+df$Insecticide <- factor(df$Insecticide)
+```
+
+## Efectividad visualizada en el experimento.
+
+Como primer paso del análisis, se hizo un diagrama de dispersión, que
+nos ayude a mostrar de manera descriptiva los efectos de cada
+insecticida por dosis.
+
+```{r diagrama_dispersion, include=TRUE, echo=FALSE, fig.dim=c(6,2.5), out.width="85%"}
+ggplot(data = df_agrupado, aes(x = Deposit, y = Killed/Number, color = Insecticide)) +
+  geom_point(size = 2.5) +
+  labs(
+    title = "Efectividad empírica por insecticida y dosis",
+    x = "Dosis [mg]",
+    y = "Efectividad observada",
+    color = "Insecticida"
+  ) +
+  theme_gray(base_size = 9) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  scale_x_continuous(limits = c(1.5, 8.5), breaks = unique(df_agrupado$Deposit))
+```
+
+Esta primera gráfica es un buen acercamiento para plantear preguntas de investigación, pues para todas las dosis parece que el insecticida $C$ es superior a los insecticidas $A$, $B$, los cuales parecen tener un desempeño similar, pues algunos de sus puntos se sobreponen o se encuentran con efectividades muy parecidas.
+
+```{r grafica_barras, include=FALSE, echo=FALSE, fig.dim=c(6,2.5)}
+# Como segundo gráfico para visualizar este comportamiento tenemos:
+ggplot(data = df, aes(x = as.factor(Deposit), fill = Dead)) +
+  geom_bar(position = "fill") +
+  facet_wrap(~ Insecticide) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    x = "Dosis [mg]",
+    y = "Proporción",
+    title = "Proporción de Mortalidad por Dosis e Insecticida",
+    fill = "Resultado"
+  ) +
+  theme_gray(base_size = 9) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    strip.background = element_rect(fill = "lightgray"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+# De este último gráfico, puede verse el rendimiento general de cada uno de los insecticidas. Puede notarse que desde la tercera dosis (3.48mg) el insecticida C produjo mejores resultados que todas las dosis de los insecticidas A, B. También podemos notar que desde la primera dosis (de 2mg), el insecticida C proporcionó cerca del 50% de efectividad.
+```
+
+
+## Modelando con interacciones simples.
+
+```{r instrucciones}
+# ii. Ajuste modelos para datos binarios (ligas: logit, probit, cloglog) en donde incluya como covariables a Insecticide y Deposit, así como su interacción. Describa las expresiones del componente lineal o sistemático para cada insecticida como función de la dosis. Indique si alguno de los modelos parece adecuado para realizar el análisis deseado.
+```
+
+Como primer acercamiento, se ajustaron modelos lineales generalizados
+incluyendo las covariables $Insecticide$, $Deposit$ y sus interacciones.
+
+El componente lineal de dichos modelos se ve como sigue: $$
+\eta(Insecticide, Deposit) = \beta_0 + \beta_1 \cdot Deposit + \beta_2 \cdot \mathbb{I}_B + \beta_3 \cdot \mathbb{I}_C + \beta_4 \cdot Deposit \cdot \mathbb{I}_B + \beta_5 \cdot Deposit 
+\cdot\mathbb{I}_C
+$$ Y para cada insecticida se ve como:
+
+\begin{align*}
+\eta(Insecticide = A, Deposit) & = \beta_0 + \beta_1 \cdot Deposit\\
+\eta(Insecticide = B, Deposit) & = (\beta_0 + \beta_2) + (\beta_1 + \beta_4) \cdot Deposit\\
+\eta(Insecticide = C, Deposit) & = (\beta_0 + \beta_3) + (\beta_1 + \beta_5) \cdot Deposit
+\end{align*}
+
+Se ajustaron diferentes modelos considerando el componente lineal anterior, variando las funciones liga (*logit*, *probit* y *c-log-log* ), y los resultados se muestran en la tabla siguiente:
+
+```{r primeros_modelos}
+fitlogit = glm(formula = Dead ~ Deposit * Insecticide,
+             data = df,
+             family = binomial(link = 'logit'))
+summary(fitlogit)
+
+fitprobit = glm(formula = Dead ~ Deposit * Insecticide,
+            data = df,
+            family = binomial(link = 'probit'))
+summary(fitprobit)
+
+fitcll = glm(formula = Dead ~ Deposit * Insecticide,
+           data = df,
+           family = binomial(link = 'cloglog'))
+summary(fitcll)
+
+AIC_vector1 <- round(c(AIC(fitlogit), AIC(fitprobit), AIC(fitcll)),2)
+print(AIC_vector1)
+```
+
+
+```{r tablas_aic, include=TRUE, echo=FALSE, results='asis'}
+tabla_aic1 <- tribble(
+  ~GLM, ~AIC,
+  "Bernoulli, liga Logit", AIC_vector1[1],
+  "Bernoulli, liga Probit", AIC_vector1[2],
+  "Bernoulli, liga C-log-log", AIC_vector1[3],
+)
+tabla_aic1 %>%
+  kable(
+    format = "latex",
+    booktabs = TRUE,
+    align = 'c',
+    caption = "Comparación de AIC para Modelos con Interacción Lineal."
+  ) %>%
+  kable_styling(
+    latex_options = c("striped", "hold_position")
+  )
+```
+
+```{r ver_sup1}
+# Prueba F asociada a la tabla ANOVA.
+K=matrix(c(0,1,0,0,0,0,
+           0,0,1,0,0,0,
+           0,0,0,1,0,0,
+           0,0,0,0,1,0,
+           0,0,0,0,0,1), ncol=6, nrow=5, byrow=TRUE)
+m=c(0,0,0,0,0)
+summary(glht(fitlogit, linfct=K, rhs=m), test=Chisqtest())
+# El p-value = 2.418095e-44	< 0.05, por tanto, se rechaza H0.
+# El modelo nos aporta información para modelar a la esperanza. Bien.
+
+# Gráfica de linealidad, modelado de la varianza y distribución.
+fitlogit1_res <- simulateResiduals(fittedModel = fitlogit)
+plot(fitlogit1_res)
+# Los puntos se ven muy uniformes sobre la recta del QQ-Plot.
+  # El test de bondad de ajuste no se rechaza.
+  # El test de dispersión tampoco se rechaza.
+# En la gráfica para el componente lineal.
+  # Tenemos una nube uniforme de puntos de 1x1. Solo muy pocos huecos.
+  # Los splines estan sobre la linea punteada, salvo el ultimo (3er cuantil), 
+  # pero nada significativo.
+  # El test asociado no es significativo, indicando que no tenemos problemas.
+
+# Paso la verificación de supuestos, no hay evidencia fuerte en contra de este modelo. Es plausible su uso.
+```
+Se realizó verificación de supuestos para el modelo de menor AIC, (liga logit) y concluimos que es plausible su uso, pero es mejor considerar más opciones antes de contestar preguntas.
+
+## Modelando interacciones más complejas.
+
+Si ahora consideramos modelos incluyendo la variable $Deposit^2$, el componente lineal de nuestro GLM se ve de la forma:
+\begin{align*}
+\eta(Insecticide, Deposit) = & \beta_0 + \beta_1 \cdot Deposit + \beta_2 \cdot Deposit^2 + \beta_3 \cdot \mathbb{I}_B + \beta_4 \cdot \mathbb{I}_C + \beta_5 \cdot Deposit \cdot \mathbb{I}_B + \beta_6 \cdot Deposit \cdot \mathbb{I}_C + \\
+ & +\beta_7 \cdot Deposit^2 \cdot \mathbb{I}_B + \beta_8 \cdot Deposit^2 \cdot \mathbb{I}_C
+\end{align*}
+Y para cada insecticida obtenemos que:
+\begin{align*}
+\eta(Insecticide = A, Deposit) & = \beta_0 + \beta_1 \cdot Deposit + \beta_2 \cdot Deposit^2 \\
+\eta(Insecticide = B, Deposit) & = (\beta_0 + \beta_3) + (\beta_1 + \beta_5) \cdot Deposit + (\beta_2 + \beta_7) \cdot Deposit^2 \\
+\eta(Insecticide = C, Deposit) & = (\beta_0 + \beta_4) + (\beta_1 + \beta_6) \cdot Deposit + (\beta_2 + \beta_8) \cdot Deposit^2
+\end{align*}
+
+Ajustando modelos con ese componente lineal para las mismas ligas (*logit*, *probit* y *c-log-log* ) obtuvimos los resultados de la tabla siguiente:
+
+```{r modelos_cuadraticos}
+fitlogit2 <- glm(formula = Dead ~ (Deposit + I(Deposit^2)) * Insecticide,
+                 data = df,
+                 family = binomial(link = 'logit'))
+summary(fitlogit2)
+
+fitprobit2 <- glm(formula = Dead ~ (Deposit + I(Deposit^2)) * Insecticide,
+                  data = df,
+                  family = binomial(link = 'probit'))
+summary(fitprobit2)
+
+fitcll2 <- glm(formula = Dead ~ (Deposit + I(Deposit^2)) * Insecticide,
+               data = df,
+               family = binomial(link = 'cloglog'))
+summary(fitcll2)
+
+AIC_vector2 <- round(c(AIC(fitlogit2), AIC(fitprobit2), AIC(fitcll2)), 2)
+print(AIC_vector2)
+```
+
+```{r tablas_aic2, include=TRUE, echo=FALSE, results='asis'}
+# "Modelo con interacciones $Deposit$*$Insecticide$ y $Deposit^2$*$Insecticide$"
+tabla_aic2 <- tribble(
+  ~GLM, ~AIC,
+  "Bernoulli, liga Logit", AIC_vector2[1],
+  "Bernoulli, liga Probit", AIC_vector2[2],
+  "Bernoulli, liga C-log-log", AIC_vector2[3],
+)
+tabla_aic2 %>%
+  kable(
+    format = "latex",
+    booktabs = TRUE,
+    align = 'c',
+    caption = "Comparación de AIC para Modelos con Interacción Cuadrática"
+  ) %>%
+  kable_styling(
+    latex_options = c("striped", "hold_position")
+  )
+```
+
+Notamos que todos estos modelos son más verosimiles que los de interacciones lineales, y nuevamente, el modelo con la liga logit es el de menor AIC y es nuestro mejor candidato para modelar. Analizando los supuestos de este modelo:
+```{r versup_2.1}
+# Prueba F asociada a la tabla ANOVA.
+K=matrix(c(0,1,0,0,0,0,0,0,0,
+           0,0,1,0,0,0,0,0,0,
+           0,0,0,1,0,0,0,0,0,
+           0,0,0,0,1,0,0,0,0,
+           0,0,0,0,0,1,0,0,0,
+           0,0,0,0,0,0,1,0,0,
+           0,0,0,0,0,0,0,1,0,
+           0,0,0,0,0,0,0,0,1), ncol=9, nrow=8, byrow=TRUE)
+m=c(0,0,0,0,0,0,0,0)
+summary(glht(fitlogit2, linfct=K, rhs=m), test=Chisqtest())
+# El p-value = 2.665843e-43	< 0.05, por tanto, se rechaza H0.
+# El modelo nos aporta información para modelar a la esperanza.
+```
+
+Para nuestro modelo, se rechazo la hipótesis nula en la prueba F asociada a la tabla ANOVA, indicando que este modelo nos aporta información para modelar a la esperanza.
+Analizando los gráficos de bondad de ajuste y del componente lineal:
+
+```{r versup_2.2, include=TRUE, echo=FALSE, fig.dim=c(7,4), out.width="70%"}
+# Gráfica de linealidad, modelado de la varianza y distribución.
+fitlogit2_res <- simulateResiduals(fittedModel = fitlogit2)
+plot(fitlogit2_res)                 # Tamaño de números en ejes al 70%)
+# Los puntos se ven muy uniformes sobre la recta del QQ-Plot.
+  # El test de bondad de ajuste no se rechaza.
+  # El test de dispersión tampoco se rechaza.
+# En la gráfica para el componente lineal.
+  # Tenemos una nube uniforme de puntos de 1x1. 
+  # Los splines estan sobre la linea punteada.
+  # El test no es significativo, indicando que no tenemos problemas.
+
+# Paso la verificación de supuestos, no hay evidencia fuerte en contra de este modelo.
+```
+
+- Los puntos se ven muy uniformes sobre la recta del QQ-Plot y ambos tests (de bondad y modelado de varianza) se rechazan, indicando que no hay problemas con estas cuestiones.
+
+- La gráfica del componente lineal se ve muy uniforme, y el test asociado no es significativo, indicando que no tenemos problemas serios con esta parte.
+
+Finalmente, efectuamos una prueba de modelos anidados, con fin de comparar nuestro modelo de interacciones cuadráticas con el de interacciones simples y determinar si es necesario usar el modelo completo.
+\[
+H_0: \text{"Es plausible el modelo reducido"} \qquad vs \qquad H_a: \text{"Se requiere el modelo completo"}
+\]
+```{r modelos_anidados}
+# Ho: Modelo simple vs Ha: Modelo completo.
+anova(fitlogit, fitlogit2, test = "Chisq")
+# El p-value = 1.662e-06 < 0.05, asi que rechazamos H0.
+# Es mejor el modelo completo (el que incluye Deposit^2 y sus interacciones).
+```
+De dicha prueba obtuvimos p-value = 1.662e-06 < 0.05, y por tanto, rechazamos $H_0$. Concluimos que debemos ir por el modelo completo.
+
+Dado que el modelo completo pasó las pruebas de hipótesis, se probó que es significativamente mejor para modelar que nuestro primer modelo candidato y a pesar de tener más parámetros, resultó ser el modelo de menor AIC (más verosimil), será con el que modelemos. \textcolor{blue}{GLM Bernoulli, liga Logit, con interacciones cuadráticas.}
+
+## Estimaciones, comparaciones y conclusión.
+
+A continuación, presentamos nuevamente el gráfico de dispersión del inicio, pero esta vez incluyendo las estimaciones puntuales  hechas por nuestro mejor modelo.
+
+```{r grafica_scatter_puntual, out.width="85%", include=TRUE, echo=FALSE, fig.dim=c(6,2.5)}
+grid_prediccion_2 <- crossing(
+  Deposit = seq(min(df$Deposit)-0.5, max(df$Deposit)+0.5, length.out = 100),
+  Insecticide = unique(df$Insecticide)
+)
+
+predicciones_logit2 <- predict(fitlogit2, newdata = grid_prediccion_2, type = "response")
+grid_prediccion_2$Probabilidad_predicha_logit2 <- predicciones_logit2
+
+ggplot() +
+  geom_point(data = df_agrupado, 
+             aes(x = Deposit, y = Killed/Number, color = Insecticide), 
+             size = 2.5) +
+  
+  geom_line(data = grid_prediccion_2, 
+            aes(x = Deposit, y = Probabilidad_predicha_logit2, color = Insecticide), 
+            linewidth = 1) +
+  labs(
+    title = "Estimaciones de la efectividad por insecticida y dosis",
+    x = "Dosis [mg]",
+    y = "Efectividad",
+    color = "Insecticida"
+  ) +
+  theme_gray(base_size = 9) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  scale_x_continuous(limits = c(1.5, 8.5), breaks = unique(df$Deposit))
+```
+
+### Un insecticida efectivo con dosis baja y significativamente mejor.
+
+Lo más importante para un insecticida es que tenga una alta efectividad, así que, calculamos la dosis mínima para matar al 72% de los insectos y se presenta en la tabla siguiente:
+
+```{r}
+solver_eq <- function(a, b, c, Ins){
+  raiz_pos <- (-b + sqrt(b^2 - 4*a*c)) / (2*a)
+  raiz_neg <- (-b - sqrt(b^2 - 4*a*c)) / (2*a)
+  x <- round(min(raiz_pos, raiz_neg), 2)
+  return(x)
+}
+
+min72_A <- solver_eq(fitlogit2$coefficients[3], fitlogit2$coefficients[2], fitlogit2$coefficients[1] - log(72/28), "A")
+
+min72_B <- solver_eq(fitlogit2$coefficients[3] + fitlogit2$coefficients[8], fitlogit2$coefficients[2] + fitlogit2$coefficients[6], fitlogit2$coefficients[1] + fitlogit2$coefficients[4] - log(72/28), "B")
+
+min72_C <-solver_eq(fitlogit2$coefficients[3] + fitlogit2$coefficients[9], fitlogit2$coefficients[2] + fitlogit2$coefficients[7], fitlogit2$coefficients[1] + fitlogit2$coefficients[5] - log(72/28), "C")
+
+
+predict(fitlogit2, newdata = data.frame(Deposit = 6.29, Insecticide = "A"), type = "response")
+
+predict(fitlogit2, newdata = data.frame(Deposit = 5.69, Insecticide = "B"), type = "response")
+
+predict(fitlogit2, newdata = data.frame(Deposit = 2.69, Insecticide = "C"), type = "response")
+```
+
+```{r dosis_minima72, include=TRUE, echo=FALSE, results='asis'}
+tabla_dosismin <- tribble(
+  ~Insecticida, ~Dosis,
+  "A", paste0(min72_A, "mg"),
+  "B", paste0(min72_B, "mg"),
+  "C", paste0(min72_C, "mg"),
+)
+tabla_dosismin %>%
+  kable(
+    format = "latex",
+    booktabs = TRUE,
+    col.names = c("Insecticida", "Dosis Mínima"),
+    align = 'c',
+    caption = "Dosis Mínima para un 72\\% de Mortalidad por Insecticida."
+  ) %>%
+  kable_styling(
+    latex_options = c("striped", "hold_position")
+  )
+```
+Notamos que, la dosis del insecticida $C$ de $2.69$mg es mucho menor que las de los otros insecticidas para conseguir ese grado de efectividad(para $A$ y $B$ es más del doble de ese valor).
+
+Considerando el valor de dicha dosis, $2.69$mg, podemos hacer una prueba de hipótesis y concluir estadísticamente si para dicho valor, existe un insecticida que es mejor. Como principal candidato tenemos al insecticida $C$, así que nos interesa verificar el siguiente par de hipótesis:
+\begin{align*}
+\mathbb{P}(y = 1; Insecticide = C, Deposit = 2.69) > \mathbb{P}(y = 1; Insecticide = A, Deposit = 2.69)\\
+\mathbb{P}(y = 1; Insecticide = C, Deposit = 2.69) > \mathbb{P}(y = 1; Insecticide = B, Deposit = 2.69) 
+\end{align*}
+Aplicando la función liga, podemos expresar la prueba de hipótesis global en términos del componente lineal y se ven como sigue:
+$$
+H_0: [\:\beta_4 + \beta_6\cdot 2.69 + \beta_8\cdot 2.69^2 \leq 0\:] \land [\: (\beta_4-\beta_3) + (\beta_6-\beta_5)\cdot 2.69 + (\beta_8-\beta_7)\cdot 2.69^2 \leq 0\:]
+$$
+$$vs$$
+$$
+H_a: [\:(\beta_4 + \beta_6\cdot 2.69 + \beta_8\cdot 2.69^2 > 0\:] \lor [\: (\beta_4-\beta_3) + (\beta_6-\beta_5)\cdot 2.69 + (\beta_8-\beta_7)\cdot 2.69^2 > 0\:]
+$$
+
+```{r pruebas_multcomp}
+library(multcomp)
+#            0 1 2  3 4     5     6          7       8
+K = matrix(c(0,0,0, 0,1,    0, 2.69,         0, 2.69^2,
+             0,0,0,-1,1,-2.69, 2.69, -(2.69^2), 2.69^2),
+           nrow=2, ncol = 9, byrow = TRUE)
+m = c(0,0)
+
+summary(glht(fitlogit2, linfct=K, rhs=m, alternative="greater"))
+# Se rechazan las dos, concluyo ambas alternativas.
+# Puedo concluir que el incecticida C es mejor que los incecticidas A y B.
+```
+
+Efectuando pruebas de hipótesis simultaneas, obtuvimos que se rechazaron ambas hipótesis nulas ($\leq$) con p-value ajustado menor que 0.05. Podemos garantizar que el insecticida $C$ es mejor que los insecticidas $A$ y $B$.
+
+### Comportamiento de los insecticidas $A$ y $B$.
+
+Visto lo anterior, ahora podemos hacer una prueba de hipótesis para determinar si los insecticidas $A$ y $B$ tienen comportamientos similares. Planteando las hipótesis en términos de los $\beta$'s se reducen a la prueba lineal general siguiente:
+\[
+H_0: (\beta_3 = 0)\land(\beta_5 = 0)\land(\beta_7 = 0) \qquad vs \qquad H_a: (\beta_3 \neq 0)\land(\beta_5 \neq 0)\land(\beta_7 \neq 0)
+\]
+
+```{r prueba_multcomp_2}
+#            0 1 2 3 4 5 6 7 8
+K = matrix(c(0,0,0,1,0,0,0,0,0,
+             0,0,0,0,0,1,0,0,0,
+             0,0,0,0,0,0,0,1,0),
+           nrow=3, ncol = 9, byrow = TRUE)
+m = c(0,0,0)
+
+summary(glht(fitlogit2, linfct=K, rhs=m), test = Ftest())
+  # p-value = 0.462 >= 0.05, entonces no se rechaza H0: (b3=0)y(b5=0)y(b7=0).
+  # No hay evidencia suficiente para concluir que A y B se comportan diferente.
+  # Concluimos que se comportan de manera similar.
+```
+El resultado de la prueba fue un p-value = 0.462, por tanto, no podemos rechazar $H_0$ y no hay evidencia para garantizar que los insecticidas $A$ y $B$ se comportan diferente. Por falta de evidencia, podemos asumir que tienen un rendimiento similar.
