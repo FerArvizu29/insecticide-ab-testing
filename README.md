@@ -3,19 +3,18 @@
 
 ## Descripción general
 En este proyecto se analiza la efectividad de tres insecticidas variando la dosis aplicada en grupos homogéneos de insectos.  
-La variable respuesta es binaria (éxito / fracaso), por lo que el análisis se realiza mediante modelos lineales generalizados (GLM), criterios de selección de modelos y pruebas de hipótesis.
+La variable respuesta es binaria (éxito / fracaso), por lo que el análisis se realiza mediante modelos lineales generalizados (GLM) de tipo binario, criterios de selección de modelos basados en verosimilitud y pruebas de hipótesis de tipo A/B para comparación entre grupos.
 
-El objetivo del análisis es:
-- identificar el insecticida más efectivo,
-- evaluar la relación dosis–respuesta,
-- y estimar la dosis necesaria para alcanzar un nivel objetivo de efectividad.
+Los objetivos del análisis son:
+- Identificar el insecticida más efectivo.
+- Evaluar la relación dosis–respuesta.
+- Estimar la dosis necesaria para alcanzar un nivel objetivo de efectividad.
 
 ---
 
 ## Descripción de los datos.
-- Datos experimentales con respuestas binarias agrupadas.
-- Tres insecticidas evaluados a distintos niveles de dosis.
-- Los datos se encontraban originalmente agrupados y posteriormente se desagruparon para el ajuste de modelos.
+- Datos experimentales con respuestas binarias agrupadas. (Se desagruparon para el ajuste de los modelos)
+- Tres insecticidas (A,B,C) evaluados a distintos niveles de dosis en mg (2.0, 2.6, 3.5, 6.1, 8.0).
 
 Los datos pueden consultarse en el archivo _Datos_Insecticidas.csv_ del mismo repositorio.
 ---
@@ -55,8 +54,8 @@ Se ajustaron distintos modelos lineales generalizados:
 - Se identificó un insecticida con **efectividad significativamente mayor**.
 - Los insecticidas restantes mostraron un rendimiento **similar entre sí e inferior** al tratamiento más efectivo.
 - La relación dosis–respuesta varía entre insecticidas, evidenciando efectos de interacción.
-  
-El reporte puede consultarse en el archivo _Reporte_Insecticidas.pdf_ del mismo repositorio.
+
+### El reporte puede consultarse en el archivo _Reporte_Insecticidas.pdf_ del mismo repositorio.
 
 ---
 
