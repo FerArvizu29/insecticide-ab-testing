@@ -42,6 +42,8 @@ Se ajustaron distintos modelos lineales generalizados:
 - Obtención de curvas dosis–respuesta por insecticida.
 - Cálculo de la **dosis requerida para alcanzar una efectividad del 72%** en cada tratamiento.
 
+<img width="976" height="428" alt="image" src="https://github.com/user-attachments/assets/79525eca-ee8b-49f5-9924-e551cc5a2d64" />
+
 ### 5. Pruebas de hipótesis
 - Aplicación de pruebas estadísticas (ANOVA o enfoque de pruebas A/B) para:
   - identificar diferencias estadísticamente significativas entre insecticidas,
