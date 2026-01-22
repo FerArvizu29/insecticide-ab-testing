@@ -16,7 +16,7 @@ Los objetivos del análisis son:
 - Datos experimentales con respuestas binarias agrupadas. (Se desagruparon para el ajuste de los modelos)
 - Tres insecticidas (A,B,C) evaluados a distintos niveles de dosis en mg (2.0, 2.6, 3.5, 6.1, 8.0).
 
-Los datos pueden consultarse en el archivo _Datos_Insecticidas.csv_ del mismo repositorio.
+### Los datos pueden consultarse en el archivo _Datos_Insecticidas.csv_ del mismo repositorio.
 ---
 
 ## Metodología
